@@ -11,10 +11,12 @@ Estados:
 
 import math
 import sys
+import random
 import pygame
 from simulacao import SimuladorDrones
+from drone import Drone
 
-# ── Dimensões ─────────────────────────────────────────────────────────
+# Dimensões
 LARGURA       = 960
 ALTURA_TOTAL  = 660
 ALTURA_TOPO   = 52
@@ -22,7 +24,7 @@ ALTURA_BOTOES = 80
 ALTURA_SIM    = ALTURA_TOTAL - ALTURA_TOPO - ALTURA_BOTOES   # 528
 FPS           = 60
 
-# ── Paleta ────────────────────────────────────────────────────────────
+# Paleta
 C_FUNDO       = (10,  14,  26)   # fundo config screen
 C_BARRA       = (14,  19,  36)   # barras topo / botão
 C_BORDA       = (38,  54,  92)
@@ -32,7 +34,7 @@ C_TEXTO       = (210, 228, 255)
 C_TEXTO_SEC   = (100, 128, 172)
 C_ACENTO      = ( 72, 172, 255)
 
-# Drones (cores visíveis sobre fundo branco)
+# Drones
 C_DRONE_VOO    = ( 30, 110, 210)
 C_DRONE_CHEGOU = ( 25, 150,  60)
 C_DESTINO      = (100, 120, 160)
@@ -57,9 +59,7 @@ C_PLAY        = (38, 188,  82)
 C_PLAY_H      = (52, 218,  98)
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  Componente: Botão com fundo (usado somente na config screen)
-# ══════════════════════════════════════════════════════════════════════
+#  Componente: Botão com fundo
 class Botao:
     def __init__(self, x, y, w, h, texto, cor, cor_hover, rb=10):
         self.rect      = pygame.Rect(x, y, w, h)
@@ -86,12 +86,10 @@ class Botao:
         return self.rect.collidepoint(pos)
 
 
-# ══════════════════════════════════════════════════════════════════════
-#  App
-# ══════════════════════════════════════════════════════════════════════
+# App
 class App:
 
-    # ── Inicialização ─────────────────────────────────────────────────
+    #  Inicialização 
     def __init__(self):
         pygame.init()
         pygame.display.set_caption("Simulador de Drones")
@@ -120,10 +118,11 @@ class App:
 
     def _criar_botoes(self):
         cx = LARGURA // 2
-        self.btn_start_cfg = Botao(cx - 130, 0, 260, 52, "INICIAR SIMULAÇÃO", C_PLAY, C_PLAY_H)
+        self.btn_manual = Botao(cx - 250, 0, 240, 52, "INSERIR MANUAL", (45, 100, 200), (60, 120, 220))
+        self.btn_aleatorio = Botao(cx + 10, 0, 240, 52, "GERAR ALEATÓRIO", C_PLAY, C_PLAY_H)
         self.rect_input    = pygame.Rect(cx - 110, 0, 220, 50)
 
-    # ── Loop principal ────────────────────────────────────────────────
+    #  Loop principal
     def run(self):
         while True:
             eventos = pygame.event.get()
@@ -137,7 +136,7 @@ class App:
             pygame.display.flip()
             self.relogio.tick(FPS)
 
-    # ══ Tela de Configuração ══════════════════════════════════════════
+    #  Tela de Configuração
     def _draw_config(self, eventos):
         self.tela.fill(C_FUNDO)
         cx, cy = LARGURA // 2, ALTURA_TOTAL // 2
@@ -173,39 +172,47 @@ class App:
             err_s = self.f_pequena.render(self._erro, True, C_EXP_BORDA)
             self.tela.blit(err_s, err_s.get_rect(centerx=cx, top=self.rect_input.bottom + 28))
 
-        # Botão iniciar
+        # Botões iniciar
         pos_m = pygame.mouse.get_pos()
-        self.btn_start_cfg.rect.center = (cx, cy + 10)
-        self.btn_start_cfg.atualizar(pos_m)
-        self.btn_start_cfg.desenhar(self.tela, self.f_btn)
+        self.btn_manual.rect.center = (cx - 130, cy + 20)
+        self.btn_aleatorio.rect.center = (cx + 130, cy + 20)
+        self.btn_manual.atualizar(pos_m)
+        self.btn_aleatorio.atualizar(pos_m)
+        self.btn_manual.desenhar(self.tela, self.f_btn)
+        self.btn_aleatorio.desenhar(self.tela, self.f_btn)
 
         # Eventos
         for ev in eventos:
             if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 self._input_at = self.rect_input.collidepoint(ev.pos)
-                if self.btn_start_cfg.clicado(ev.pos):
-                    self._tentar_iniciar()
+                if self.btn_manual.clicado(ev.pos):
+                    self._tentar_iniciar("manual")
+                elif self.btn_aleatorio.clicado(ev.pos):
+                    self._tentar_iniciar("aleatorio")
             elif ev.type == pygame.KEYDOWN and self._input_at:
                 if ev.key == pygame.K_BACKSPACE:
                     self._input = self._input[:-1]; self._erro = ""
                 elif ev.key == pygame.K_RETURN:
-                    self._tentar_iniciar()
+                    self._tentar_iniciar("aleatorio")
                 elif ev.unicode.isdigit() and len(self._input) < 2:
                     self._input += ev.unicode; self._erro = ""
 
-    def _tentar_iniciar(self):
+    def _tentar_iniciar(self, modo="aleatorio"):
         try:
             qtd = int(self._input)
             if 1 <= qtd <= 50:
                 self.qtd = qtd; self._erro = ""
-                self._preparar_simulacao()
+                if modo == "aleatorio":
+                    self._preparar_simulacao_aleatoria()
+                else:
+                    self._preparar_simulacao_manual()
             else:
                 self._erro = "Digite um valor entre 1 e 50."
         except ValueError:
             self._erro = "Valor inválido. Digite apenas números."
 
-    def _preparar_simulacao(self):
-        """Reseta e gera drones — mantém self.qtd atual."""
+    def _preparar_simulacao_aleatoria(self):
+        """Reseta e gera drones aleatórios."""
         self.sim.resetar()
         self.sim.gerar_drones_aleatorios(
             self.qtd,
@@ -216,7 +223,14 @@ class App:
         )
         self.estado = "aguardando"
 
-    # ══ Tela de Simulação ═════════════════════════════════════════════
+    def _preparar_simulacao_manual(self):
+        """Prepara a tela para o usuário clicar e adicionar os drones."""
+        self.sim.resetar()
+        self.estado = "posicionamento"
+        self._drones_criados = 0
+        self._ponto_inicio = None
+
+    # Tela de Simulação
     def _draw_sim(self, eventos):
         # Barras escuras (preenchimento base) + área de simulação branca
         self.tela.fill(C_BARRA)
@@ -233,16 +247,36 @@ class App:
         for drone in self.sim.drones:
             self._desenhar_drone(drone)
 
+        # Desenha o drone temporário durante o posicionamento
+        if self.estado == "posicionamento" and self._ponto_inicio:
+            mpos = pygame.mouse.get_pos()
+            # Linha até o mouse
+            if mpos[1] > ALTURA_TOPO and mpos[1] < ALTURA_TOPO + ALTURA_SIM:
+                pygame.draw.line(self.tela, C_DESTINO, self._ponto_inicio, mpos, 1)
+                pygame.draw.rect(self.tela, C_DESTINO, (mpos[0]-5, mpos[1]-5, 10, 10))
+            # Drone no início
+            pygame.draw.circle(self.tela, C_DRONE_VOO, self._ponto_inicio, 6)
+            pygame.draw.circle(self.tela, (255, 255, 255), self._ponto_inicio, 6, 1)
+
         # Mensagem de status sobre a área de simulação
-        msgs = {
-            "aguardando": ("Clique em INICIAR para começar a simulação", (80, 100, 160)),
-            "pausado":    ("— SIMULAÇÃO PAUSADA —",                       (180, 148, 35)),
-            "concluido":  ("Simulação concluída!",                         (25, 140, 65)),
-        }
-        if self.estado in msgs:
-            txt, cor = msgs[self.estado]
-            s = self.f_media.render(txt, True, cor)
+        if self.estado == "posicionamento":
+            idx = getattr(self, "_drones_criados", 0) + 1
+            if getattr(self, "_ponto_inicio", None) is None:
+                txt = f"Clique para definir o INÍCIO do Drone {idx}"
+            else:
+                txt = f"Clique para definir o DESTINO do Drone {idx}"
+            s = self.f_media.render(txt, True, C_ACENTO)
             self.tela.blit(s, s.get_rect(centerx=LARGURA // 2, top=ALTURA_TOPO + 12))
+        else:
+            msgs = {
+                "aguardando": ("Clique em INICIAR para começar a simulação", (80, 100, 160)),
+                "pausado":    ("— SIMULAÇÃO PAUSADA —",                       (180, 148, 35)),
+                "concluido":  ("Simulação concluída!",                         (25, 140, 65)),
+            }
+            if self.estado in msgs:
+                txt, cor = msgs[self.estado]
+                s = self.f_media.render(txt, True, cor)
+                self.tela.blit(s, s.get_rect(centerx=LARGURA // 2, top=ALTURA_TOPO + 12))
 
         # Barras superior e inferior
         self._draw_barra_topo()
@@ -259,6 +293,26 @@ class App:
             if ev.type != pygame.MOUSEBUTTONDOWN or ev.button != 1:
                 continue
 
+            if self.estado == "posicionamento":
+                # Ignora cliques fora da área de simulação
+                if ALTURA_TOPO < ev.pos[1] < ALTURA_TOPO + ALTURA_SIM:
+                    if self._ponto_inicio is None:
+                        self._ponto_inicio = ev.pos
+                    else:
+                        dest = ev.pos
+                        novo_drone = Drone(
+                            self._drones_criados + 1,
+                            self._ponto_inicio[0], self._ponto_inicio[1],
+                            dest[0], dest[1],
+                        )
+                        self.sim.adicionar_drone(novo_drone)
+                        self._ponto_inicio = None
+                        self._drones_criados += 1
+                        
+                        if self._drones_criados >= self.qtd:
+                            self.estado = "aguardando"
+                # Os botões inferiores ainda podem ser clicados (ex: Quit)
+
             def hit(nome):
                 if nome not in self._barra_btns:
                     return False
@@ -268,7 +322,9 @@ class App:
             if hit("quit"):
                 self._sair()
             elif hit("restart"):
-                self._preparar_simulacao()          # mesmo qtd, novos drones
+                self.sim.finalizar()
+                self._input = str(self.qtd); self._erro = ""
+                self.estado = "config"
             elif hit("play"):
                 if self.estado == "aguardando":
                     self.sim.iniciar()
@@ -287,7 +343,9 @@ class App:
             elif self.estado == "aguardando":
                 self.sim.iniciar(); self.estado = "rodando"
         elif ev.key == pygame.K_r:
-            self._preparar_simulacao()
+            self.sim.finalizar()
+            self._input = str(self.qtd); self._erro = ""
+            self.estado = "config"
         elif ev.key == pygame.K_ESCAPE:
             self.sim.finalizar()
             self._input = str(self.qtd); self._erro = ""
@@ -297,7 +355,7 @@ class App:
         self.sim.finalizar()
         pygame.quit(); sys.exit()
 
-    # ── Barra superior ────────────────────────────────────────────────
+    #  Barra superior
     def _draw_barra_topo(self):
         pygame.draw.rect(self.tela, C_BARRA, (0, 0, LARGURA, ALTURA_TOPO))
         pygame.draw.line(self.tela, C_BORDA,
@@ -323,7 +381,7 @@ class App:
             self.tela.blit(inf_s, inf_s.get_rect(
                 centerx=LARGURA // 2, centery=ALTURA_TOPO // 2))
 
-    # ── Barra inferior com botões ícone ───────────────────────────────
+    #  Barra inferior com botões ícone
     def _draw_barra_botoes(self):
         y0 = ALTURA_TOTAL - ALTURA_BOTOES
         pygame.draw.rect(self.tela, C_BARRA, (0, y0, LARGURA, ALTURA_BOTOES))
@@ -340,7 +398,7 @@ class App:
             layout = [("pause",   cx - 80), ("restart", cx), ("quit", cx + 80)]
         elif self.estado in ("aguardando", "pausado"):
             layout = [("play",    cx - 80), ("restart", cx), ("quit", cx + 80)]
-        else:  # concluido — sem play/pause
+        else:  # concluido ou posicionamento — sem play/pause
             layout = [("restart", cx - 40), ("quit",    cx + 40)]
 
         # Salva posições para detecção de clique
@@ -367,7 +425,7 @@ class App:
             elif nome == "restart": self._icon_restart(bx, cy, icon_sz, color)
             elif nome == "quit":    self._icon_quit(bx, cy, icon_sz, color)
 
-    # ── Ícones desenhados com pygame.draw ─────────────────────────────
+    # Ícones desenhados com pygame.draw
     def _icon_play(self, cx, cy, size, color):
         """Triângulo apontando para a direita."""
         pts = [(cx - size // 2, cy - size),
@@ -410,7 +468,7 @@ class App:
         pygame.draw.line(self.tela, color,
                          (cx + size, cy - size), (cx - size, cy + size), th)
 
-    # ── Desenho de drone ──────────────────────────────────────────────
+    #  Desenho de drone
     def _desenhar_drone(self, drone):
         # Destino
         if drone.status != "destruido":

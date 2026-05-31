@@ -3,7 +3,7 @@ import math
 class Drone:
     """Representa um drone individual na simulação."""
 
-    def __init__(self, id_drone, pos_x, pos_y, dest_x, dest_y, velocidade=1.0):
+    def __init__(self, id_drone, pos_x, pos_y, dest_x, dest_y, velocidade=1.5):
         self.id = id_drone
         self.x = float(pos_x)
         self.y = float(pos_y)

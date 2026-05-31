@@ -16,19 +16,14 @@ class SimuladorDrones:
         self._pausa_inicio = None
         self._pausa_acumulada = 0.0
 
-    # ------------------------------------------------------------------ #
-    # Registrador de Eventos (LOGS)                                      #
-    # ------------------------------------------------------------------ #
+    # Registrador de Eventos (LOGS)                                      
     def _registrar_evento(self, id_drone, evento, x, y):
         """Salva o evento no arquivo logs.txt no momento exato em que ocorre."""
         tempo_atual = self.tempo_simulado()
         with open("logs.txt", "a", encoding="utf-8") as f:
             f.write(f"[{tempo_atual:.2f}s] Drone {id_drone:02d} | {evento:<12} | Posição: ({x:.1f}, {y:.1f})\n")
 
-    # ------------------------------------------------------------------ #
-    # Ciclo de vida                                                      #
-    # ------------------------------------------------------------------ #
-
+    # Ciclo de vida                                                   
     def resetar(self):
         """Reinicia todos os dados para uma nova simulação."""
         self.drones.clear()
@@ -66,10 +61,7 @@ class SimuladorDrones:
         if self.tempo_fim is None and self.tempo_inicio is not None:
             self.tempo_fim = time()
 
-    # ------------------------------------------------------------------ #
-    # Loop de atualização (chamado a cada frame enquanto 'rodando')      #
-    # ------------------------------------------------------------------ #
-
+    # Loop de atualização (chamado a cada frame enquanto 'rodando')
     def atualizar(self):
         """
         Executa um passo da simulação.
@@ -98,10 +90,7 @@ class SimuladorDrones:
             self.tempo_fim = time()
         return ativa
 
-    # ------------------------------------------------------------------ #
-    # Lógica interna                                                     #
-    # ------------------------------------------------------------------ #
-
+    # Lógica interna
     def _checar_colisoes(self):
         for i in range(len(self.drones)):
             for j in range(i + 1, len(self.drones)):
@@ -131,10 +120,7 @@ class SimuladorDrones:
             return self.tempo_fim - self.tempo_inicio - self._pausa_acumulada
         return time() - self.tempo_inicio - self._pausa_acumulada - pausa_atual
 
-    # ------------------------------------------------------------------ #
-    # Geração de cenário                                                 #
-    # ------------------------------------------------------------------ #
-
+    # Geração de cenário
     def gerar_drones_aleatorios(self, quantidade, x_max, y_min, y_max, margem=40):
         """Gera N drones com posições e destinos aleatórios dentro da área dada."""
         for i in range(quantidade):
@@ -142,15 +128,12 @@ class SimuladorDrones:
             y  = random.randint(y_min + margem, y_max - margem)
             x_dest = random.randint(margem, x_max - margem)
             y_dest = random.randint(y_min + margem, y_max - margem)
-            vel    = random.uniform(1.0, 2.5)
+            # vel    = random.uniform(1.0, 2.5)
             self.adicionar_drone(
-                Drone(i + 1, x, y, x_dest, y_dest, velocidade=vel)
+                Drone(i + 1, x, y, x_dest, y_dest)
             )
 
-    # ------------------------------------------------------------------ #
-    # Métricas                                                           #
-    # ------------------------------------------------------------------ #
-
+    # Métricas
     def calcular_metricas(self):
         """Retorna um dicionário com todas as métricas da simulação."""
         total = len(self.drones)
