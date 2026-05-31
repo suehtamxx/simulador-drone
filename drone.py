@@ -1,6 +1,5 @@
 import math
 
-
 class Drone:
     """Representa um drone individual na simulação."""
 

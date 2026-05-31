@@ -2,7 +2,6 @@ import random
 from time import time
 from drone import Drone
 
-
 class SimuladorDrones:
     """
     Gerencia toda a lógica da simulação:
@@ -14,12 +13,20 @@ class SimuladorDrones:
         self.passos = 0
         self.tempo_inicio = None
         self.tempo_fim = None
-        # Controle de pausa (para excluir do cálculo de tempo)
         self._pausa_inicio = None
         self._pausa_acumulada = 0.0
 
     # ------------------------------------------------------------------ #
-    # Ciclo de vida                                                        #
+    # Registrador de Eventos (LOGS)                                      #
+    # ------------------------------------------------------------------ #
+    def _registrar_evento(self, id_drone, evento, x, y):
+        """Salva o evento no arquivo logs.txt no momento exato em que ocorre."""
+        tempo_atual = self.tempo_simulado()
+        with open("logs.txt", "a", encoding="utf-8") as f:
+            f.write(f"[{tempo_atual:.2f}s] Drone {id_drone:02d} | {evento:<12} | Posição: ({x:.1f}, {y:.1f})\n")
+
+    # ------------------------------------------------------------------ #
+    # Ciclo de vida                                                      #
     # ------------------------------------------------------------------ #
 
     def resetar(self):
@@ -37,6 +44,11 @@ class SimuladorDrones:
     def iniciar(self):
         """Marca o início oficial da simulação (quando PLAY é clicado)."""
         self.tempo_inicio = time()
+        # Registra a partida de todos os drones
+        for d in self.drones:
+            self._registrar_evento(d.id, "Iniciou Voo", d.x, d.y)
+        with open("logs.txt", "a", encoding="utf-8") as f:
+            f.write("\n\n")
 
     def pausar(self):
         """Registra o instante em que a simulação foi pausada."""
@@ -55,7 +67,7 @@ class SimuladorDrones:
             self.tempo_fim = time()
 
     # ------------------------------------------------------------------ #
-    # Loop de atualização (chamado a cada frame enquanto 'rodando')        #
+    # Loop de atualização (chamado a cada frame enquanto 'rodando')      #
     # ------------------------------------------------------------------ #
 
     def atualizar(self):
@@ -73,8 +85,11 @@ class SimuladorDrones:
         for drone in self.drones:
             era_voo = drone.status == "em_voo"
             drone.mover()
+            
+            # Se ele estava voando e AGORA chegou, registra o evento!
             if era_voo and drone.status == "chegou":
                 drone.tempo_chegada = tempo_atual
+                self._registrar_evento(drone.id, "Chegou", drone.x, drone.y)
 
         self._checar_colisoes()
 
@@ -84,7 +99,7 @@ class SimuladorDrones:
         return ativa
 
     # ------------------------------------------------------------------ #
-    # Lógica interna                                                       #
+    # Lógica interna                                                     #
     # ------------------------------------------------------------------ #
 
     def _checar_colisoes(self):
@@ -95,6 +110,10 @@ class SimuladorDrones:
                     if di.calcular_distancia(dj) < 12.0:
                         di.status = "colidiu"
                         dj.status = "colidiu"
+                        
+                        # Registra o evento da colisão no momento exato
+                        self._registrar_evento(di.id, "Colidiu", di.x, di.y)
+                        self._registrar_evento(dj.id, "Colidiu", dj.x, dj.y)
 
     def esta_ativa(self):
         """True enquanto houver drones em voo ou em animação de explosão."""
@@ -113,23 +132,23 @@ class SimuladorDrones:
         return time() - self.tempo_inicio - self._pausa_acumulada - pausa_atual
 
     # ------------------------------------------------------------------ #
-    # Geração de cenário                                                   #
+    # Geração de cenário                                                 #
     # ------------------------------------------------------------------ #
 
     def gerar_drones_aleatorios(self, quantidade, x_max, y_min, y_max, margem=40):
         """Gera N drones com posições e destinos aleatórios dentro da área dada."""
         for i in range(quantidade):
-            x_ini  = random.randint(margem, x_max - margem)
-            y_ini  = random.randint(y_min + margem, y_max - margem)
+            x  = random.randint(margem, x_max - margem)
+            y  = random.randint(y_min + margem, y_max - margem)
             x_dest = random.randint(margem, x_max - margem)
             y_dest = random.randint(y_min + margem, y_max - margem)
             vel    = random.uniform(1.0, 2.5)
             self.adicionar_drone(
-                Drone(i + 1, x_ini, y_ini, x_dest, y_dest, velocidade=vel)
+                Drone(i + 1, x, y, x_dest, y_dest, velocidade=vel)
             )
 
     # ------------------------------------------------------------------ #
-    # Métricas                                                             #
+    # Métricas                                                           #
     # ------------------------------------------------------------------ #
 
     def calcular_metricas(self):
@@ -145,6 +164,12 @@ class SimuladorDrones:
         t_total = self.tempo_simulado()
         tempos  = [d.tempo_chegada for d in self.drones if d.tempo_chegada is not None]
         t_medio = (sum(tempos) / len(tempos)) if tempos else 0.0
+
+        # O arquivo metricas.txt continua sendo gerado normalmente ao final
+        with open("metricas.txt", "a", encoding="utf-8") as f:
+            if f.tell() == 0: 
+                f.write("Total;Chegaram;Colidiram;Não concluiram;Tempo Total(s);Tempo Médio Chegada(s);Taxa Colisão(%);Taxa Sucesso(%);Distância Média Percorrida(px);Passos\n")
+            f.write(f"{total};{chegaram};{colidiram};{nao_conc};{t_total:.2f}s;{t_medio:.2f}s;{(colidiram / total) * 100:.1f}%;{(chegaram / total) * 100:.1f}%;{sum(d.distancia_percorrida for d in self.drones) / total:.1f}px;{self.passos}\n")
 
         return {
             "total":               total,
